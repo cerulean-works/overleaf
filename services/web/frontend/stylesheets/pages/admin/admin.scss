@@ -111,6 +111,109 @@
   display: list-item;
 }
 
+.server-admin-dashboard {
+  max-width: 1600px;
+  padding-right: var(--spacing-08);
+  padding-left: var(--spacing-08);
+
+  @include media-breakpoint-down(md) {
+    padding-right: var(--spacing-06);
+    padding-left: var(--spacing-06);
+  }
+}
+
+.server-admin-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-06);
+  margin-bottom: var(--spacing-08);
+
+  h1 {
+    margin-bottom: var(--spacing-04);
+  }
+}
+
+.server-admin-nav,
+.server-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-05);
+}
+
+.server-admin-nav a {
+  display: block;
+  padding: var(--spacing-04) var(--spacing-06);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--border-radius-medium);
+  background: var(--bg-light-primary);
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--bg-light-secondary);
+  }
+}
+
+.server-admin-section {
+  margin-top: var(--spacing-08);
+  padding: var(--spacing-08);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--border-radius-large);
+  background: var(--bg-light-primary);
+  scroll-margin-top: var(--spacing-06);
+
+  h2 {
+    margin-bottom: var(--spacing-06);
+  }
+
+  h3 {
+    font-size: var(--font-size-05);
+  }
+
+  .table-responsive {
+    margin-top: var(--spacing-06);
+  }
+
+  td {
+    vertical-align: middle;
+  }
+
+  @include media-breakpoint-down(md) {
+    padding: var(--spacing-06);
+  }
+}
+
+.server-admin-site-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-06);
+
+  @include media-breakpoint-down(lg) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.server-admin-card {
+  min-width: 0;
+  padding: var(--spacing-06);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--border-radius-medium);
+}
+
+.server-admin-diagnostics {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+
+  summary {
+    display: list-item;
+    font-weight: bold;
+    cursor: pointer;
+  }
+}
+
 .expiration-label {
   vertical-align: super;
 }

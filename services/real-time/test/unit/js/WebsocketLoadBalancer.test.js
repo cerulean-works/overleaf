@@ -284,6 +284,72 @@ describe('WebsocketLoadBalancer', function () {
   })
 
   describe('_processEditorEvent', function () {
+    describe('global account permissions invalidation', function () {
+      beforeEach(function (ctx) {
+        ctx.target = {
+          id: 'target-1',
+          ol_context: { user_id: 'target', privilege_level: 'owner' },
+          disconnect: sinon.stub(),
+        }
+        ctx.targetOtherProject = {
+          id: 'target-2',
+          ol_context: { user_id: 'target', privilege_level: 'readAndWrite' },
+          disconnect: sinon.stub(),
+        }
+        ctx.unrelated = {
+          id: 'other',
+          ol_context: { user_id: 'other', privilege_level: 'owner' },
+          disconnect: sinon.stub(),
+        }
+        ctx.io.sockets = {
+          clients: sinon
+            .stub()
+            .returns([
+              ctx.target,
+              ctx.targetOtherProject,
+              ctx.unrelated,
+              ctx.target,
+            ]),
+          emit: sinon.stub(),
+        }
+      })
+
+      it('revokes cached privileges and disconnects only the targeted user on every project', function (ctx) {
+        ctx.WebsocketLoadBalancer._processEditorEvent(
+          ctx.io,
+          'editor-events',
+          JSON.stringify({
+            room_id: 'all',
+            message: 'user:permissions:changed',
+            payload: [{ userId: 'target' }],
+          })
+        )
+        sinon.assert.calledOnce(ctx.target.disconnect)
+        sinon.assert.calledOnce(ctx.targetOtherProject.disconnect)
+        sinon.assert.notCalled(ctx.unrelated.disconnect)
+        expect(ctx.target.ol_context.privilege_level).to.equal('none')
+        expect(ctx.targetOtherProject.ol_context.privilege_level).to.equal(
+          'none'
+        )
+        expect(ctx.unrelated.ol_context.privilege_level).to.equal('owner')
+        sinon.assert.notCalled(ctx.io.sockets.emit)
+      })
+
+      it('ignores malformed invalidation events without disconnecting or broadcasting', function (ctx) {
+        ctx.WebsocketLoadBalancer._processEditorEvent(
+          ctx.io,
+          'editor-events',
+          JSON.stringify({
+            room_id: 'all',
+            message: 'user:permissions:changed',
+            payload: [{}],
+          })
+        )
+        sinon.assert.notCalled(ctx.io.sockets.clients)
+        sinon.assert.notCalled(ctx.io.sockets.emit)
+      })
+    })
+
     describe('with bad JSON', function () {
       beforeEach(function (ctx) {
         ctx.isRestrictedUser = false

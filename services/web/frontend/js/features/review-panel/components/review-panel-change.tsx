@@ -74,12 +74,16 @@ export const ReviewPanelChange = memo<{
     }, [acceptChanges, aggregate, change, showGenericMessageModal, t])
 
     const rejectHandler = useCallback(async () => {
-      if (aggregate) {
-        await rejectChanges(change, aggregate)
-      } else {
-        await rejectChanges(change)
+      setAccepting(true)
+      try {
+        if (aggregate) await rejectChanges(change, aggregate)
+        else await rejectChanges(change)
+      } catch {
+        showGenericMessageModal(t('error'), t('generic_something_went_wrong'))
+      } finally {
+        setAccepting(false)
       }
-    }, [aggregate, change, rejectChanges])
+    }, [aggregate, change, rejectChanges, showGenericMessageModal, t])
 
     const translations = useMemo(
       () => ({

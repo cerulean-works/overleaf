@@ -7,6 +7,7 @@ const RedisManager = require('./RedisManager')
 const {
   EditOperationBuilder,
   StringFileData,
+  AddCommentOperation,
   EditOperationTransformer,
 } = require('overleaf-editor-core')
 const Metrics = require('./Metrics')
@@ -87,8 +88,73 @@ async function tryApplyUpdate(projectId, docId, update, profiler) {
 
   if (!update.dup) {
     const file = StringFileData.fromRaw(lines)
-    for (const op of ops) {
-      file.edit(op)
+    await require('./CommentAuthorization').assertCommentAnchors(
+      projectId,
+      file.getComments().toArray(),
+      update,
+      ops
+        .filter(op => 'commentId' in op && 'ranges' in op)
+        .map(op => op.commentId)
+    )
+    const describe = value =>
+      value
+        .getTrackedChanges()
+        .asSorted()
+        .map(change => ({
+          metadata: { user_id: change.tracking.userId, ts: change.tracking.ts },
+          op:
+            change.tracking.type === 'insert'
+              ? {
+                  p: change.range.start,
+                  i: value
+                    .getContent()
+                    .slice(change.range.start, change.range.end),
+                }
+              : {
+                  p: change.range.start,
+                  d: value
+                    .getContent()
+                    .slice(change.range.start, change.range.end),
+                },
+        }))
+    const protectedBefore = update.meta.reviewer ? describe(file) : null
+    if (update.meta.reviewer) {
+      for (const raw of update.op) {
+        if (!('textOperation' in raw)) continue
+        for (const scan of raw.textOperation) {
+          if (
+            typeof scan === 'object' &&
+            'tracking' in scan &&
+            scan.tracking &&
+            (!('userId' in scan.tracking) ||
+              scan.tracking.userId !== update.meta.user_id)
+          ) {
+            throw new Error('Reviewer cannot forge tracked change authorship')
+          }
+        }
+      }
+    }
+    for (const [index, op] of ops.entries()) {
+      let authorizedOp = op
+      if (update.meta.canEdit === false && op instanceof AddCommentOperation) {
+        // Adding/moving an anchor must not be a back door to resolving or
+        // reopening a thread. Those actions use the authorized web endpoint.
+        authorizedOp = new AddCommentOperation(
+          op.commentId,
+          op.ranges,
+          file.getComments().getComment(op.commentId)?.resolved ?? false
+        )
+      }
+      file.edit(authorizedOp)
+      ops[index] = authorizedOp
+    }
+    update.op = ops.map(op => op.toJSON())
+    if (protectedBefore) {
+      require('./ReviewPolicy').assertProtectedChanges(
+        protectedBefore,
+        describe(file),
+        update.meta.user_id
+      )
     }
     version += 1
     update.meta.ts = Date.now()

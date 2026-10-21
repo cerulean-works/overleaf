@@ -1,4 +1,6 @@
 import AdminController from './Features/ServerAdmin/AdminController.mjs'
+import UserAdminRouter from './Features/ServerAdmin/UserAdminRouter.mjs'
+import ProjectAdminRouter from './Features/ServerAdmin/ProjectAdminRouter.mjs'
 import ErrorController from './Features/Errors/ErrorController.mjs'
 import Features from './infrastructure/Features.mjs'
 import ProjectController from './Features/Project/ProjectController.mjs'
@@ -1118,6 +1120,8 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     AuthorizationMiddleware.ensureUserIsSiteAdmin,
     AdminController.index
   )
+  UserAdminRouter.apply(webRouter)
+  ProjectAdminRouter.apply(webRouter)
 
   if (!Features.hasFeature('saas')) {
     webRouter.post(

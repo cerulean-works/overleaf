@@ -1426,6 +1426,24 @@ describe('AuthenticationController', function () {
       })
     })
 
+    it('does not log in an account awaiting site invitation acceptance', async function (ctx) {
+      ctx.req.session = {}
+      ctx.user.siteInvitationPending = true
+      await ctx.AuthenticationController.promises.finishLogin(
+        ctx.user,
+        ctx.req,
+        ctx.res,
+        ctx.next
+      )
+      sinon.assert.notCalled(ctx.req.login)
+      sinon.assert.calledWith(
+        ctx.AsyncFormHelper.redirect,
+        ctx.req,
+        ctx.res,
+        '/account-suspended'
+      )
+    })
+
     describe('preFinishLogin hook', function () {
       it('call hook and proceed', async function (ctx) {
         await ctx.AuthenticationController.promises.finishLogin(

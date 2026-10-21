@@ -174,6 +174,11 @@ app.delete(
   HttpController.deleteComment
 )
 
+app.post(
+  '/project/:project_id/doc/:doc_id/review/:action',
+  HttpController.reviewAction
+)
+
 app.post('/project/:project_id/block', HttpController.blockProject)
 app.post('/project/:project_id/unblock', HttpController.unblockProject)
 

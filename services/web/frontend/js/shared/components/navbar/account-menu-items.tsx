@@ -24,6 +24,9 @@ export function AccountMenuItems({
   const logOutFormId = 'logOutForm'
   const dsNavStyle = useDsNavStyle()
   const hasOverallThemes = Boolean(getMeta('ol-overallThemes'))
+  const canDisplayAdminMenu = getMeta('ol-navbar')?.canDisplayAdminMenu
+  const isCommunityEdition = getMeta('ol-ExposedSettings').env === 'server-ce'
+  const sourceUrl = getMeta('ol-navbar')?.sourceUrl
 
   return (
     <>
@@ -34,6 +37,12 @@ export function AccountMenuItems({
       <NavDropdownLinkItem href="/user/settings">
         {t('account_settings')}
       </NavDropdownLinkItem>
+      {canDisplayAdminMenu && (
+        <NavDropdownLinkItem href="/admin">Admin panel</NavDropdownLinkItem>
+      )}
+      {isCommunityEdition && sourceUrl && (
+        <NavDropdownLinkItem href={sourceUrl}>Source code</NavDropdownLinkItem>
+      )}
       {showSubscriptionLink ? (
         <NavDropdownLinkItem href="/user/subscription">
           {t('subscription')}

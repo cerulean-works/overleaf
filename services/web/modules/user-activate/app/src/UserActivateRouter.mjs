@@ -10,7 +10,7 @@ export default {
     webRouter.get(
       '/admin/user',
       AuthorizationMiddleware.ensureUserIsSiteAdmin,
-      (req, res) => res.redirect('/admin/register')
+      (req, res) => res.redirect('/admin#users')
     )
 
     webRouter.get('/user/activate', UserActivateController.activateAccountPage)
@@ -19,7 +19,7 @@ export default {
     webRouter.get(
       '/admin/register',
       AuthorizationMiddleware.ensureUserIsSiteAdmin,
-      UserActivateController.registerNewUser
+      (req, res) => res.redirect('/admin#users')
     )
     webRouter.post(
       '/admin/register',

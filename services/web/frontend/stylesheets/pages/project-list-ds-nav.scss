@@ -50,14 +50,6 @@ body {
   .navbar-default {
     position: relative;
 
-    .navbar-header .navbar-logo {
-      @include media-breakpoint-up(md) {
-        position: relative;
-        top: calc(var(--spacing-05) * 2);
-        left: var(--spacing-05);
-      }
-    }
-
     .nav-item-projects {
       display: none !important;
     }
@@ -154,9 +146,8 @@ body {
       flex-direction: column;
       flex: 0 0 15%;
       max-width: 320px;
-      min-width: 200px;
-      margin-top: var(--spacing-03);
-      padding: calc(var(--spacing-08) - 1px) 0 0;
+      min-width: 248px;
+      padding: var(--spacing-05) 0 0;
 
       .new-project-dropdown {
         padding: 0 var(--spacing-08) var(--spacing-05) var(--spacing-05);
@@ -390,7 +381,8 @@ body {
     .project-ds-nav-main {
       display: flex;
       flex-direction: column;
-      min-height: 100%;
+      flex: 1 0 auto;
+      min-height: 0;
       padding: var(--spacing-08) var(--spacing-06);
 
       @include media-breakpoint-up(md) {
@@ -486,6 +478,8 @@ body {
       }
 
       .project-ds-nav-content {
+        display: flex;
+        flex-direction: column;
         flex-grow: 1;
         overflow-y: auto;
         position: relative;
@@ -534,18 +528,6 @@ body {
       &::after {
         display: none;
       }
-    }
-  }
-
-  .ds-nav-ds-name {
-    color: var(--ds-nav-color);
-    margin-bottom: var(--spacing-05);
-
-    span {
-      text-transform: uppercase;
-      font-weight: bold;
-
-      @include body-xs;
     }
   }
 

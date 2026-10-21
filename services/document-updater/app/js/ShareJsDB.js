@@ -109,6 +109,48 @@ module.exports = ShareJsDB = class ShareJsDB {
   }
 
   _writeOp(docKey, opData, callback) {
+    if (opData.meta?.canEdit === false || opData.meta?.reviewer) {
+      // ShareJS has rebased the operation at this point. Check the current
+      // persisted ranges before the model broadcasts or commits anything.
+      const DocumentManager = require('./DocumentManager')
+      const RangesManager = require('./RangesManager')
+      const { assertProtectedChanges } = require('./ReviewPolicy')
+      DocumentManager.promises
+        .getDoc(this.project_id, this.doc_id)
+        .then(async doc => {
+          await require('./CommentAuthorization').assertCommentAnchors(
+            this.project_id,
+            doc.ranges?.comments || [],
+            opData,
+            opData.op.filter(op => typeof op.c === 'string').map(op => op.t)
+          )
+          const text = require('./sharejs/types/text').apply(
+            doc.lines.join('\n'),
+            opData.op
+          )
+          const { newRanges } = RangesManager.applyUpdate(
+            this.project_id,
+            this.doc_id,
+            doc.ranges,
+            [opData],
+            text.split('\n'),
+            { historyRangesSupport: doc.historyRangesSupport }
+          )
+          if (opData.meta.reviewer)
+            assertProtectedChanges(
+              doc.ranges?.changes || [],
+              newRanges.changes || [],
+              opData.meta.user_id
+            )
+          this._recordOp(docKey, opData, callback)
+        })
+        .catch(callback)
+      return
+    }
+    return this._recordOp(docKey, opData, callback)
+  }
+
+  _recordOp(docKey, opData, callback) {
     if (this.appliedOps[docKey] == null) {
       this.appliedOps[docKey] = []
     }

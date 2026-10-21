@@ -22,7 +22,7 @@ describe('UserActivateController', function () {
         getUser: sinon.stub(),
       },
     }
-    ctx.UserRegistrationHandler = { promises: {} }
+    ctx.SiteInvitationManager = { create: sinon.stub() }
     ctx.ErrorController = { notFound: sinon.stub() }
     ctx.SplitTestHandler = {
       promises: {
@@ -35,9 +35,9 @@ describe('UserActivateController', function () {
     }))
 
     vi.doMock(
-      '../../../../../app/src/Features/User/UserRegistrationHandler.mjs',
+      '../../../../../app/src/Features/ServerAdmin/SiteInvitationManager.mjs',
       () => ({
-        default: ctx.UserRegistrationHandler,
+        default: ctx.SiteInvitationManager,
       })
     )
 
@@ -136,21 +136,16 @@ describe('UserActivateController', function () {
 
   describe('register', function () {
     beforeEach(async function (ctx) {
-      ctx.UserRegistrationHandler.promises.registerNewUserAndSendActivationEmail =
-        sinon.stub().resolves({
-          user: ctx.user,
-          setNewPasswordUrl: (ctx.url = 'mock/url'),
-        })
+      ctx.SiteInvitationManager.create.resolves({
+        invitation: ctx.user,
+        url: (ctx.url = 'mock/url'),
+      })
       ctx.req.body.email = ctx.user.email = ctx.email = 'email@example.com'
       await ctx.UserActivateController.register(ctx.req, ctx.res)
     })
 
     it('should register the user and send them an email', function (ctx) {
-      sinon.assert.calledWith(
-        ctx.UserRegistrationHandler.promises
-          .registerNewUserAndSendActivationEmail,
-        ctx.email
-      )
+      sinon.assert.calledWith(ctx.SiteInvitationManager.create, ctx.email)
     })
 
     it('should return the user and activation url', function (ctx) {
@@ -158,6 +153,7 @@ describe('UserActivateController', function () {
         .calledWith({
           email: ctx.email,
           setNewPasswordUrl: ctx.url,
+          invitation: ctx.user,
         })
         .should.equal(true)
     })
@@ -167,8 +163,10 @@ describe('UserActivateController', function () {
     beforeEach(function (ctx) {
       ctx.req.body = {}
       ctx.res.sendStatus = sinon.stub()
-      ctx.UserRegistrationHandler.promises.registerNewUserAndSendActivationEmail =
-        sinon.stub().resolves({ user: ctx.user, setNewPasswordUrl: 'mock/url' })
+      ctx.SiteInvitationManager.create.resolves({
+        invitation: ctx.user,
+        url: 'mock/url',
+      })
     })
 
     it('should return 422', async function (ctx) {
@@ -178,10 +176,7 @@ describe('UserActivateController', function () {
 
     it('should not register a user', async function (ctx) {
       await ctx.UserActivateController.register(ctx.req, ctx.res)
-      sinon.assert.notCalled(
-        ctx.UserRegistrationHandler.promises
-          .registerNewUserAndSendActivationEmail
-      )
+      sinon.assert.notCalled(ctx.SiteInvitationManager.create)
     })
   })
 

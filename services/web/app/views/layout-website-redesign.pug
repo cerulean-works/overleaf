@@ -15,7 +15,7 @@ block body
 
 	block content
 
-	if typeof suppressFooter == 'undefined'
+	if typeof suppressFooter == 'undefined' && settings.env !== 'server-ce'
 		if showThinFooter
 			include layout/thin-footer
 		else

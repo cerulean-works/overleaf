@@ -1,0 +1,204 @@
+diff --git a/lib/transports/websocket/hybi-07-12.js b/lib/transports/websocket/hybi-07-12.js
+index fcce38b0564e0bc3c3080689786314c03ec4239a..56cb32aa47fa773ba28fd217170902475a582cef 100644
+--- a/lib/transports/websocket/hybi-07-12.js
++++ b/lib/transports/websocket/hybi-07-12.js
+@@ -39,10 +39,11 @@ function WebSocket (mng, data, req, socket) {
+   this.parser.on('data', function (packet) {
+     self.onMessage(parser.decodePacket(packet));
+   });
+-  this.parser.on('ping', function () {
+-    // version 8 ping => pong
++  this.parser.on('ping', function (data) {
++    // Control frames are binary and a pong must echo the ping's exact bytes.
++    // Writing U+008A as a string encodes C2 8A, which corrupts the frame header.
+     try {
+-      self.socket.write('\u008a\u0000');
++      self.socket.write(self.frame(0x8a, data));
+     }
+     catch (e) {
+       self.end();
+@@ -369,54 +370,43 @@ function Parser (opts) {
+       self.emit('close');
+       self.reset();
+     },
+-    // ping
++    // ping/pong
+     '9': function(data) {
+-      if (self.state.lastFragment == false) {
+-        self.error('fragmented ping is not supported');
++      if (!self.state.lastFragment) {
++        self.error('fragmented control frame is not supported');
+         return;
+       }
+-      
+-      var finish = function(mask, data) {
+-        self.emit('ping', self.unmask(mask, data));
+-        self.endPacket();
++      var length = data[1] & 0x7f;
++      if (length > 125) {
++        self.error('control frame payload exceeds 125 bytes');
++        return;
+       }
+ 
+-      var expectData = function(length) {
+-        if (self.state.masked) {
+-          self.expect('Mask', 4, function(data) {
+-            var mask = data;
+-            self.expect('Data', length, function(data) {
+-              finish(mask, data);
+-            });
+-          });
++      var finish = function(mask, data) {
++        if (self.state.opcode == 9) {
++          self.emit('ping', self.unmask(mask, data, true));
+         }
+-        else {
+-          self.expect('Data', length, function(data) { 
+-            finish(null, data);
++        self.endPacket();
++      };
++      var readData = function(mask) {
++        if (length == 0) {
++          finish(mask, Buffer.alloc(0));
++        } else {
++          self.expect('Data', length, function(data) {
++            finish(mask, data);
+           });
+-        } 
+-      }
+-
+-      // decode length
+-      var firstLength = data[1] & 0x7f;
+-      if (firstLength == 0) {
+-        finish(null, null);        
+-      }
+-      else if (firstLength < 126) {
+-        expectData(firstLength);
+-      }
+-      else if (firstLength == 126) {
+-        self.expect('Length', 2, function(data) {
+-          expectData(util.unpack(data));
+-        });
++        }
++      };
++      if (self.state.masked) {
++        // Even a zero-length client frame includes the four-byte mask.
++        self.expect('Mask', 4, readData);
++      } else {
++        readData(null);
+       }
+-      else if (firstLength == 127) {
+-        self.expect('Length', 8, function(data) {
+-          expectData(util.unpack(data));
+-        });
+-      }      
+     }
+-  }
++  };
++  // Unsolicited pongs are legal. Consume them without sending another pong.
++  this.opcodeHandlers['10'] = this.opcodeHandlers['9'];
+ 
+   this.expect('Opcode', 2, this.processPacket);  
+ };
+diff --git a/lib/transports/websocket/hybi-16.js b/lib/transports/websocket/hybi-16.js
+index 5e39d4c65f13b4a0c08e19ea974f3aae79308571..b971be8b2e28438aaba0eb96cd32c0f3cafbd8a2 100644
+--- a/lib/transports/websocket/hybi-16.js
++++ b/lib/transports/websocket/hybi-16.js
+@@ -38,10 +38,11 @@ function WebSocket (mng, data, req, socket) {
+   this.parser.on('data', function (packet) {
+     self.onMessage(parser.decodePacket(packet));
+   });
+-  this.parser.on('ping', function () {
+-    // version 8 ping => pong
++  this.parser.on('ping', function (data) {
++    // Control frames are binary and a pong must echo the ping's exact bytes.
++    // Writing U+008A as a string encodes C2 8A, which corrupts the frame header.
+     try {
+-      self.socket.write('\u008a\u0000');
++      self.socket.write(self.frame(0x8a, data));
+     }
+     catch (e) {
+       self.end();
+@@ -367,54 +368,43 @@ function Parser (opts) {
+       self.emit('close');
+       self.reset();
+     },
+-    // ping
++    // ping/pong
+     '9': function(data) {
+-      if (self.state.lastFragment == false) {
+-        self.error('fragmented ping is not supported');
++      if (!self.state.lastFragment) {
++        self.error('fragmented control frame is not supported');
+         return;
+       }
+-      
+-      var finish = function(mask, data) {
+-        self.emit('ping', self.unmask(mask, data));
+-        self.endPacket();
++      var length = data[1] & 0x7f;
++      if (length > 125) {
++        self.error('control frame payload exceeds 125 bytes');
++        return;
+       }
+ 
+-      var expectData = function(length) {
+-        if (self.state.masked) {
+-          self.expect('Mask', 4, function(data) {
+-            var mask = data;
+-            self.expect('Data', length, function(data) {
+-              finish(mask, data);
+-            });
+-          });
++      var finish = function(mask, data) {
++        if (self.state.opcode == 9) {
++          self.emit('ping', self.unmask(mask, data, true));
+         }
+-        else {
+-          self.expect('Data', length, function(data) { 
+-            finish(null, data);
++        self.endPacket();
++      };
++      var readData = function(mask) {
++        if (length == 0) {
++          finish(mask, Buffer.alloc(0));
++        } else {
++          self.expect('Data', length, function(data) {
++            finish(mask, data);
+           });
+-        } 
+-      }
+-
+-      // decode length
+-      var firstLength = data[1] & 0x7f;
+-      if (firstLength == 0) {
+-        finish(null, null);        
+-      }
+-      else if (firstLength < 126) {
+-        expectData(firstLength);
+-      }
+-      else if (firstLength == 126) {
+-        self.expect('Length', 2, function(data) {
+-          expectData(util.unpack(data));
+-        });
++        }
++      };
++      if (self.state.masked) {
++        // Even a zero-length client frame includes the four-byte mask.
++        self.expect('Mask', 4, readData);
++      } else {
++        readData(null);
+       }
+-      else if (firstLength == 127) {
+-        self.expect('Length', 8, function(data) {
+-          expectData(util.unpack(data));
+-        });
+-      }      
+     }
+-  }
++  };
++  // Unsolicited pongs are legal. Consume them without sending another pong.
++  this.opcodeHandlers['10'] = this.opcodeHandlers['9'];
+ 
+   this.expect('Opcode', 2, this.processPacket);  
+ };

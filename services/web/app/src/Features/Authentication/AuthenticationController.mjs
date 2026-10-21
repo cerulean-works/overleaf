@@ -186,7 +186,7 @@ const AuthenticationController = {
       return AsyncFormHelper.redirect(req, res, '/login')
     } // OAuth2 'state' mismatch
 
-    if (user.suspended) {
+    if (user.suspended || user.siteInvitationPending) {
       return AsyncFormHelper.redirect(req, res, '/account-suspended')
     }
 

@@ -63,6 +63,7 @@ export const db = {
   rooms: internalDb.collection('rooms'),
   samlCache: internalDb.collection('samlCache'),
   samlLogs: internalDb.collection('samlLogs'),
+  siteInvitations: internalDb.collection('siteInvitations'),
   spellingPreferences: internalDb.collection('spellingPreferences'),
   splittests: internalDb.collection('splittests'),
   ssoConfigs: internalDb.collection('ssoConfigs'),

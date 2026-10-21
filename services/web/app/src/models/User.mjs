@@ -242,6 +242,9 @@ export const UserSchema = new Schema(
     analyticsId: { type: String, required: true },
     completedTutorials: Schema.Types.Mixed,
     suspended: { type: Boolean },
+    // Set at provision time, before an invitation/token exists. A pending
+    // invitation cannot be bypassed through login or ordinary password reset.
+    siteInvitationPending: { type: Boolean, default: false },
     dsMobileApp: {
       subscribed: { type: Boolean },
     },

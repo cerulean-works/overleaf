@@ -10,6 +10,7 @@ import LoggedInItems from '@/shared/components/navbar/logged-in-items'
 import LoggedOutItems from '@/shared/components/navbar/logged-out-items'
 import HeaderLogoOrTitle from '@/shared/components/navbar/header-logo-or-title'
 import MaterialIcon from '@/shared/components/material-icon'
+import getMeta from '@/utils/meta'
 import { useContactUsModal } from '@/shared/hooks/use-contact-us-modal'
 import { UserProvider } from '@/shared/context/user-context'
 import { X } from '@phosphor-icons/react'
@@ -41,6 +42,7 @@ function DefaultNavbar(
     items,
   } = props
   const { t } = useTranslation()
+  const { isOverleaf } = getMeta('ol-ExposedSettings')
   const [expanded, setExpanded] = useState(false)
 
   // The Contact us modal is rendered at this level rather than inside the nav
@@ -107,9 +109,10 @@ function DefaultNavbar(
                 className="justify-content-end"
               >
                 <Nav as="ul" className="ms-auto" role="menubar">
-                  {canDisplayAdminMenu ||
-                  canDisplayAdminRedirect ||
-                  canDisplaySplitTestMenu ? (
+                  {isOverleaf &&
+                  (canDisplayAdminMenu ||
+                    canDisplayAdminRedirect ||
+                    canDisplaySplitTestMenu) ? (
                     <AdminMenu
                       canDisplayAdminMenu={canDisplayAdminMenu}
                       canDisplayAdminRedirect={canDisplayAdminRedirect}

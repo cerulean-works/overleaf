@@ -62,6 +62,7 @@ import { SubscriptionChangePreview } from '../../../types/subscription/subscript
 import { SubscriptionCreationPreview } from '../../../types/subscription/subscription-creation-preview'
 import { DefaultNavbarMetadata } from '@/shared/components/types/default-navbar-metadata'
 import { FooterMetadata } from '@/shared/components/types/footer-metadata'
+import type { ServerAdminMetadata } from '../../../types/server-admin'
 import type { ScriptLogType } from '../../../modules/admin-panel/frontend/js/features/script-logs/script-log'
 import { Subscription as AdminSubscription } from '../../../types/admin/subscription'
 import { AdminCapability } from '../../../types/admin-capabilities'
@@ -72,6 +73,7 @@ import { SharingPermissions } from '../../../modules/sharing-permissions/app/src
 import { FullHistoryFailure } from '@ol-types/history/projectHistory'
 
 export interface Meta {
+  'ol-serverAdmin': ServerAdminMetadata
   'ol-ExposedSettings': ExposedSettings
   'ol-adminCapabilities': AdminCapability[]
   'ol-adminSubscription': AdminSubscription

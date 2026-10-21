@@ -1327,6 +1327,27 @@ describe('WebsocketController', function () {
       ctx.DocumentUpdaterManager.queueChange = sinon.stub().callsArg(3)
     })
 
+    it('overwrites forged reviewer metadata with the joined client privilege', function (ctx) {
+      ctx.client.ol_context.privilege_level = 'review'
+      ctx.update.meta = { reviewer: false }
+      ctx.WebsocketController.applyOtUpdate(
+        ctx.client,
+        ctx.doc_id,
+        ctx.update,
+        ctx.callback
+      )
+      expect(ctx.update.meta.reviewer).to.be.true
+      ctx.client.ol_context.privilege_level = 'readAndWrite'
+      ctx.update.meta.reviewer = true
+      ctx.WebsocketController.applyOtUpdate(
+        ctx.client,
+        ctx.doc_id,
+        ctx.update,
+        ctx.callback
+      )
+      expect(ctx.update.meta.reviewer).to.be.false
+    })
+
     describe('succesfully', function () {
       beforeEach(function (ctx) {
         ctx.WebsocketController.applyOtUpdate(
@@ -1499,13 +1520,16 @@ describe('WebsocketController', function () {
 
   describe('_assertClientCanApplyUpdate', function () {
     beforeEach(function (ctx) {
+      ctx.client.ol_context.user_id = ctx.user_id
       ctx.edit_update = {
         op: [
           { i: 'foo', p: 42 },
           { c: 'bar', p: 132 },
         ],
       } // comments may still be in an edit op
-      ctx.comment_update = { op: [{ c: 'bar', p: 132 }] }
+      ctx.comment_update = {
+        op: [{ c: 'bar', p: 132, t: 'aaaaaaaaaaaaaaaaaaaaaaaa' }],
+      }
       ctx.AuthorizationManager.assertClientCanEditProjectAndDoc = sinon.stub()
       ctx.AuthorizationManager.assertClientCanReviewProjectAndDoc = sinon.stub()
       ctx.AuthorizationManager.assertClientCanViewProjectAndDoc = sinon.stub()
@@ -1590,6 +1614,91 @@ describe('WebsocketController', function () {
       })
     })
 
+    for (const context of [
+      { user_id: null },
+      { user_id: 'anonymous-user' },
+      { user_id: 'named', is_restricted_user: true },
+    ]) {
+      it('denies unauthenticated/restricted raw comment anchors', async function (ctx) {
+        Object.assign(ctx.client.ol_context, context)
+        for (const update of [
+          ctx.comment_update,
+          {
+            op: [
+              {
+                commentId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+                ranges: [{ pos: 0, length: 3 }],
+              },
+            ],
+          },
+        ]) {
+          const error = await new Promise(resolve =>
+            ctx.WebsocketController._assertClientCanApplyUpdate(
+              ctx.client,
+              ctx.doc_id,
+              update,
+              resolve
+            )
+          )
+          expect(error.message).to.equal('not authorized')
+          expect(
+            ctx.AuthorizationManager.assertClientCanViewProjectAndDoc.called
+          ).to.be.false
+        }
+      })
+    }
+
+    it('rejects mixed comment/text shapes at viewer permission level', async function (ctx) {
+      ctx.AuthorizationManager.assertClientCanEditProjectAndDoc.yields(
+        new Error('not authorized')
+      )
+      ctx.AuthorizationManager.assertClientCanReviewProjectAndDoc.yields(
+        new Error('not authorized')
+      )
+      ctx.AuthorizationManager.assertClientCanViewProjectAndDoc.yields(null)
+      const id = 'aaaaaaaaaaaaaaaaaaaaaaaa'
+      for (const update of [
+        { op: [{ p: 0, c: 'anchor', t: id, i: 'INJECT' }] },
+        { op: [{ p: 0, c: 'anchor', t: id, d: 'original' }] },
+        { op: [{ p: 0, c: 'anchor', t: id, i: 'INJECT', d: 'original' }] },
+        {
+          op: [
+            {
+              commentId: id,
+              ranges: [{ pos: 0, length: 3 }],
+              textOperation: ['INJECT', 3],
+            },
+          ],
+        },
+        {
+          op: [
+            {
+              commentId: id,
+              ranges: [{ pos: 0, length: 3 }],
+              deleteComment: id,
+            },
+          ],
+        },
+        {
+          op: [
+            { commentId: id, ranges: [{ pos: 0, length: 3 }], resolved: true },
+          ],
+        },
+      ]) {
+        const error = await new Promise(resolve =>
+          ctx.WebsocketController._assertClientCanApplyUpdate(
+            ctx.client,
+            ctx.doc_id,
+            update,
+            resolve
+          )
+        )
+        expect(error.message).to.equal('not authorized')
+      }
+      expect(ctx.AuthorizationManager.assertClientCanViewProjectAndDoc.called)
+        .to.be.false
+    })
+
     describe('with a review client', function () {
       it('op with tc should succeed', async function (ctx) {
         await new Promise((resolve, reject) => {
@@ -1666,7 +1775,12 @@ describe('WebsocketController', function () {
 
       it('should route an add-comment op to view access', async function (ctx) {
         await expectRoutedTo(ctx, 'assertClientCanViewProjectAndDoc', {
-          op: [{ commentId: 'comment-id', ranges: [{ pos: 0, length: 3 }] }],
+          op: [
+            {
+              commentId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+              ranges: [{ pos: 0, length: 3 }],
+            },
+          ],
         })
       })
 
@@ -1679,6 +1793,12 @@ describe('WebsocketController', function () {
       it('should route a tracked deletion to review access', async function (ctx) {
         await expectRoutedTo(ctx, 'assertClientCanReviewProjectAndDoc', {
           op: [{ textOperation: [{ r: 3, tracking: tracking.delete }] }],
+        })
+      })
+
+      it('routes mixed scan operation shapes to edit access instead of granting reviewer access', async function (ctx) {
+        await expectRoutedTo(ctx, 'assertClientCanEditProjectAndDoc', {
+          op: [{ textOperation: [{ r: 3, i: '', tracking: tracking.insert }] }],
         })
       })
 
@@ -1713,7 +1833,7 @@ describe('WebsocketController', function () {
         // Only add-comment ops (commentId + ranges) are recognised as comment
         // updates; resolving a comment currently requires edit access.
         await expectRoutedTo(ctx, 'assertClientCanEditProjectAndDoc', {
-          op: [{ commentId: 'comment-id', resolved: true }],
+          op: [{ commentId: 'aaaaaaaaaaaaaaaaaaaaaaaa', resolved: true }],
         })
       })
 

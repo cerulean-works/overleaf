@@ -118,8 +118,16 @@ async function getProjectRanges(projectId) {
   const docIds = await RedisManager.promises.getDocIdsInProject(projectId)
   const docs = []
   for (const docId of docIds) {
-    const ranges = await RedisManager.promises.getDocRanges(docId)
-    docs.push({ id: docId, ranges })
+    try {
+      const { lines, ranges: storedRanges } =
+        await DocumentManager.promises.getDocWithLock(projectId, docId)
+      const ranges = !Array.isArray(lines)
+        ? require('./HistoryConversions').fromHistoryOT(lines).ranges
+        : storedRanges
+      docs.push({ id: docId, ranges: ranges || {} })
+    } catch (error) {
+      if (!(error instanceof Errors.NotFoundError)) throw error
+    }
   }
   return docs
 }

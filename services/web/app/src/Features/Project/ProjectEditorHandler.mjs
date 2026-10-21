@@ -1,5 +1,6 @@
 import _ from 'lodash'
 import Path from 'node:path'
+import Settings from '@overleaf/settings'
 let ProjectEditorHandler
 
 export default ProjectEditorHandler = {
@@ -50,20 +51,29 @@ export default ProjectEditorHandler = {
       result.myAccessRequest = accessRequestData.myAccessRequest
     }
 
-    result.features = _.defaults(ownerMember?.user?.features || {}, {
-      collaborators: -1, // Infinite
-      versioning: false,
-      dropbox: false,
-      compileTimeout: 60,
-      compileGroup: 'standard',
-      templates: false,
-      references: false,
-      referencesSearch: false,
-      mendeley: false,
-      trackChanges: false,
-      trackChangesVisible: ProjectEditorHandler.trackChangesAvailable,
-      symbolPalette: false,
-    })
+    result.features = _.defaults(
+      { ...ownerMember?.user?.features },
+      {
+        collaborators: -1, // Infinite
+        versioning: false,
+        dropbox: false,
+        compileTimeout: 60,
+        compileGroup: 'standard',
+        templates: false,
+        references: false,
+        referencesSearch: false,
+        mendeley: false,
+        trackChanges: false,
+        trackChangesVisible: ProjectEditorHandler.trackChangesAvailable,
+        symbolPalette: false,
+      }
+    )
+
+    if (ProjectEditorHandler.trackChangesAvailable && !Settings.overleaf) {
+      result.features.trackChanges = true
+      result.features.trackChangesVisible = true
+      result.features.reviewActionsViaHttp = true
+    }
 
     if (result.features.trackChanges) {
       result.trackChangesState = project.track_changes || false

@@ -529,6 +529,11 @@ export default WebsocketController = {
         }
         update.meta.source = client.publicId
         update.meta.user_id = userId
+        // Only real-time may assert the caller's privilege at the internal boundary.
+        update.meta.reviewer = client.ol_context.privilege_level === 'review'
+        update.meta.canEdit = ['owner', 'readAndWrite'].includes(
+          client.ol_context.privilege_level
+        )
         update.meta.tsRT = performance.now()
         metrics.inc('editor.doc-update', 0.3, { status: client.transport })
 
@@ -621,6 +626,13 @@ export default WebsocketController = {
 
   _assertClientCanApplyShareJsUpdate(client, docId, update, callback) {
     if (WebsocketController._isShareJsCommentUpdate(update)) {
+      if (
+        !client.ol_context.user_id ||
+        client.ol_context.user_id === 'anonymous-user' ||
+        client.ol_context.is_restricted_user
+      ) {
+        return callback(new NotAuthorizedError())
+      }
       return AuthorizationManager.assertClientCanViewProjectAndDoc(
         client,
         docId,
@@ -642,12 +654,20 @@ export default WebsocketController = {
   },
 
   _isShareJsCommentUpdate(update) {
-    for (const op of update.op) {
-      if (!op.c) {
-        return false
-      }
-    }
-    return true
+    return (
+      update.op.length > 0 &&
+      update.op.every(
+        op =>
+          op !== null &&
+          typeof op === 'object' &&
+          Object.keys(op).every(key => ['p', 'c', 't'].includes(key)) &&
+          Number.isInteger(op.p) &&
+          op.p >= 0 &&
+          typeof op.c === 'string' &&
+          typeof op.t === 'string' &&
+          /^[a-f0-9]{24}$/i.test(op.t)
+      )
+    )
   },
 
   _isShareJsTrackedChangesUpdate(update) {
@@ -656,6 +676,13 @@ export default WebsocketController = {
 
   _assertClientCanApplyHistoryUpdate(client, docId, update, callback) {
     if (WebsocketController._isHistoryOTCommentUpdate(update)) {
+      if (
+        !client.ol_context.user_id ||
+        client.ol_context.user_id === 'anonymous-user' ||
+        client.ol_context.is_restricted_user
+      ) {
+        return callback(new NotAuthorizedError())
+      }
       return AuthorizationManager.assertClientCanViewProjectAndDoc(
         client,
         docId,
@@ -686,12 +713,37 @@ export default WebsocketController = {
   },
 
   _isHistoryOTAddCommentOperation(op) {
-    return typeof op === 'object' && 'commentId' in op && 'ranges' in op
+    // Match the same disjoint operation that editor-core will execute. Its
+    // permissive builder prioritizes textOperation over commentId/ranges.
+    return (
+      op !== null &&
+      typeof op === 'object' &&
+      Object.keys(op).every(key => ['commentId', 'ranges'].includes(key)) &&
+      typeof op.commentId === 'string' &&
+      /^[a-f0-9]{24}$/i.test(op.commentId) &&
+      Array.isArray(op.ranges) &&
+      op.ranges.length > 0 &&
+      op.ranges.every(
+        range =>
+          range !== null &&
+          typeof range === 'object' &&
+          Object.keys(range).every(key => ['pos', 'length'].includes(key)) &&
+          Number.isInteger(range.pos) &&
+          range.pos >= 0 &&
+          Number.isInteger(range.length) &&
+          range.length > 0
+      )
+    )
   },
 
   _isHistoryOTTrackedChangesUpdate(update) {
     for (const op of update.op) {
-      if (!('textOperation' in op)) {
+      if (
+        op === null ||
+        typeof op !== 'object' ||
+        Object.keys(op).some(key => key !== 'textOperation') ||
+        !Array.isArray(op.textOperation)
+      ) {
         return false
       }
       for (const scanOp of op.textOperation) {
@@ -700,15 +752,26 @@ export default WebsocketController = {
           continue
         }
         // Plain insertions
-        if (typeof scanOp !== 'object') {
+        if (scanOp === null || typeof scanOp !== 'object') {
           return false
         }
         // Tracked insertions
-        if ('i' in scanOp && 'tracking' in scanOp) {
+        if (
+          typeof scanOp.i === 'string' &&
+          scanOp.tracking?.type === 'insert' &&
+          Object.keys(scanOp).every(key =>
+            ['i', 'tracking', 'commentIds'].includes(key)
+          )
+        ) {
           continue
         }
         // Tracked ranges (we don't accepting by clearing tracking)
-        if ('r' in scanOp && scanOp.tracking?.type !== 'none') {
+        if (
+          Number.isInteger(scanOp.r) &&
+          scanOp.r > 0 &&
+          scanOp.tracking?.type === 'delete' &&
+          Object.keys(scanOp).every(key => ['r', 'tracking'].includes(key))
+        ) {
           continue
         }
 

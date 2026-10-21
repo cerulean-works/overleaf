@@ -2,6 +2,14 @@
 
 MONOREPO_ROOT := ../
 HERE=$(shell pwd)
+DOCKER_PLATFORM ?= linux/amd64
+TEXLIVE_RELEASE ?= 2026
+TEXLIVE_ARCH ?= x86_64-linux
+TEXLIVE_BASELINE ?= basic-v1
+TEXLIVE_BUILD_ARGS = --build-arg TEXLIVE_RELEASE=$(TEXLIVE_RELEASE) --build-arg TEXLIVE_ARCH=$(TEXLIVE_ARCH) --build-arg TEXLIVE_BASELINE=$(TEXLIVE_BASELINE)
+ifneq ($(TEXLIVE_MIRROR),)
+TEXLIVE_BUILD_ARGS += --build-arg TEXLIVE_MIRROR=$(TEXLIVE_MIRROR)
+endif
 export MONOREPO_REVISION := $(shell git rev-parse HEAD)
 export BRANCH_NAME ?= $(shell git rev-parse --abbrev-ref HEAD)
 export BRANCH_NAME_TAG_SAFE ?= $(subst /,--,$(BRANCH_NAME))
@@ -27,11 +35,13 @@ refresh-cache-latest:
 	docker inspect $(OVERLEAF_LATEST) > /dev/null && docker pull $(OVERLEAF_LATEST) || true
 
 build-base:
-	cp .dockerignore $(MONOREPO_ROOT)
 	docker build \
 	  --build-arg BUILDKIT_INLINE_CACHE=1 \
 	  --progress=plain \
-	  --file Dockerfile-base \
+	  --file Dockerfile \
+	  --target base \
+	  --platform $(DOCKER_PLATFORM) \
+	  $(TEXLIVE_BUILD_ARGS) \
 	  --pull \
 	  --cache-from $(OVERLEAF_BASE_LATEST) \
 	  --cache-from $(OVERLEAF_BASE_BRANCH) \
@@ -41,11 +51,12 @@ build-base:
 
 
 build-community:
-	cp .dockerignore $(MONOREPO_ROOT)
 	docker build \
 	  --build-arg BUILDKIT_INLINE_CACHE=1 \
 	  --progress=plain \
-	  --build-arg OVERLEAF_BASE_TAG \
+	  --target community \
+	  --platform $(DOCKER_PLATFORM) \
+	  $(TEXLIVE_BUILD_ARGS) \
 	  --label "com.overleaf.ce.revision=$(MONOREPO_REVISION)" \
 	  --cache-from $(OVERLEAF_LATEST) \
 	  --cache-from $(OVERLEAF_BRANCH) \

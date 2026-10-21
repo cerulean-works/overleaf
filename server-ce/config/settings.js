@@ -48,6 +48,8 @@ const DATA_DIR = '/var/lib/overleaf/data'
 const TMP_DIR = '/var/lib/overleaf/tmp'
 
 const settings = {
+  sourceUrl:
+    process.env.OVERLEAF_SOURCE_URL || 'https://github.com/cerulean-works/overleaf',
   clsi: {
     optimiseInDocker: process.env.OPTIMISE_PDF === 'true',
   },

@@ -19,6 +19,8 @@ export type Update = {
   v: number
   meta?: {
     tc?: boolean
+    reviewer?: boolean
+    canEdit?: boolean
     user_id?: string
     ts?: number
   }
@@ -66,6 +68,8 @@ export type HistoryUpdate = {
     history_doc_length?: number
     doc_hash?: string
     tc?: boolean
+    reviewer?: boolean
+    canEdit?: boolean
     user_id?: string
   }
   projectHistoryId?: string

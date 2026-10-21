@@ -102,7 +102,10 @@ const AdminController = {
       )
       toRender.debugProjects = debugProjects
     }
-    res.render('admin/index', toRender)
+    res.render(
+      Features.hasFeature('saas') ? 'admin/legacy-index' : 'admin/index',
+      toRender
+    )
   }),
 
   disconnectAllUsers: (req, res) => {

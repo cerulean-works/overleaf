@@ -121,7 +121,26 @@ export default WebsocketLoadBalancer = {
         logger.error({ err: error, channel }, 'error parsing JSON')
         return
       }
-      if (message.room_id === 'all') {
+      if (
+        message.room_id === 'all' &&
+        message.message === 'user:permissions:changed'
+      ) {
+        const userId = message.payload?.[0]?.userId
+        if (typeof userId !== 'string' || !userId) {
+          logger.warn('Ignoring user permissions event without a user ID')
+          return
+        }
+        // This event is handled on the server, never entrusted to browser
+        // cooperation. Every realtime instance receives the global channel.
+        const seen = new Set()
+        for (const client of io.sockets.clients()) {
+          if (client.ol_context?.user_id === userId && !seen.has(client.id)) {
+            seen.add(client.id)
+            client.ol_context.privilege_level = 'none'
+            client.disconnect()
+          }
+        }
+      } else if (message.room_id === 'all') {
         io.sockets.emit(message.message, ...message.payload)
       } else if (
         message.message === 'clientTracking.refresh' &&

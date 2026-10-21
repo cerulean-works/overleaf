@@ -12,6 +12,7 @@ import { DsNavOverleafLogo } from '@/shared/components/sidebar/ds-nav-overleaf-l
 import { useProjectListContext } from '@/features/project-list/context/project-list-context'
 import importOverleafModules from '../../../../../macros/import-overleaf-module.macro'
 import { ActivePage } from '../../util/navigation-state'
+import getMeta from '@/utils/meta'
 
 function SidebarDsNav({
   activePage,
@@ -26,6 +27,7 @@ function SidebarDsNav({
   trashActive?: boolean
 }) {
   const { t } = useTranslation()
+  const isCommunityEdition = getMeta('ol-ExposedSettings').env === 'server-ce'
   const { show: showAddAffiliationWidget } = useAddAffiliation()
   const { filter, selectedTagId, selectFilter } = useProjectListContext()
   const isTrashActive =
@@ -61,7 +63,9 @@ function SidebarDsNav({
         },
       })}
     >
-      {(activePage === 'library' || isTrashActive) && <DsNavOverleafLogo />}
+      {(activePage === 'library' || (isTrashActive && !isCommunityEdition)) && (
+        <DsNavOverleafLogo />
+      )}
       <nav
         className="flex-grow flex-shrink"
         aria-label={t('project_categories_tags')}

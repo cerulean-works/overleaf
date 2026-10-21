@@ -1,7 +1,9 @@
 import Path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import UserGetter from '../../../../app/src/Features/User/UserGetter.mjs'
-import UserRegistrationHandler from '../../../../app/src/Features/User/UserRegistrationHandler.mjs'
+import SiteInvitationManager from '../../../../app/src/Features/ServerAdmin/SiteInvitationManager.mjs'
+import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.mjs'
+import { UserAdminError } from '../../../../app/src/Features/ServerAdmin/UserAdminErrors.mjs'
 import ErrorController from '../../../../app/src/Features/Errors/ErrorController.mjs'
 import { expressify } from '@overleaf/promise-utils'
 import { z, parseReq } from '../../../../app/src/infrastructure/Validation.mjs'
@@ -24,14 +26,18 @@ async function register(req, res, next) {
   if (email == null || email === '') {
     return res.sendStatus(422) // Unprocessable Entity
   }
-  const { user, setNewPasswordUrl } =
-    await UserRegistrationHandler.promises.registerNewUserAndSendActivationEmail(
-      email
-    )
-  res.json({
-    email: user.email,
-    setNewPasswordUrl,
-  })
+  try {
+    const { invitation, url } = await SiteInvitationManager.create(email, {
+      initiatorId: SessionManager.getLoggedInUserId(req.session),
+      ip: req.ip,
+    })
+    res.json({ email: invitation.email, setNewPasswordUrl: url, invitation })
+  } catch (error) {
+    if (error instanceof UserAdminError) {
+      return res.status(error.statusCode).json({ message: error.message })
+    }
+    throw error
+  }
 }
 
 const activateAccountPageSchema = z.object({

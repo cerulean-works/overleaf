@@ -46,18 +46,24 @@ If you are upgrading from a previous version of Overleaf, please see the [Releas
 
 ## Overleaf Docker Image
 
-This repo contains two dockerfiles, [`Dockerfile-base`](server-ce/Dockerfile-base), which builds the
-`sharelatex/sharelatex-base` image, and [`Dockerfile`](server-ce/Dockerfile) which builds the
-`sharelatex/sharelatex` (or "community") image.
+Build and run this fork directly from its source checkout:
 
-The Base image generally contains the basic dependencies like `wget`, plus `texlive`.
-We split this out because it's a pretty heavy set of
-dependencies, and it's nice to not have to rebuild all of that every time.
+```sh
+docker compose up --build -d
+```
 
-The `sharelatex/sharelatex` image extends the base image and adds the actual Overleaf code
-and services.
+Open <http://localhost:8080/launchpad> to create the first administrator. Optional
+configuration is documented in [`.env.example`](.env.example). See the
+[source deployment guide](server-ce/README.md) for persistent data, invitation
+secrets, TeX package installation, upgrades, and reverse proxies.
 
-Use `make build-base` and `make build-community` from `server-ce/` to build these images.
+[`server-ce/Dockerfile`](server-ce/Dockerfile) contains both the `base` dependency
+target and the `community` application target. The application builds its base
+layers from source in the same invocation, without requiring a published
+Overleaf application or base image. Docker caches the dependency layers between
+source changes. `make -C server-ce build-community` builds the complete image;
+`make -C server-ce build-base` is available separately for publishing the
+shared dependency target.
 
 We use the [Phusion base-image](https://github.com/phusion/baseimage-docker)
 (which is extended by our `base` image) to provide us with a VM-like container

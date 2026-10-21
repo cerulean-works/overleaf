@@ -280,7 +280,11 @@ async function _createBlankProject(
       user,
       'history-ranges-support'
     )
-  if (historyRangesSupportAssignment.variant === 'enabled') {
+  if (
+    historyRangesSupportAssignment.variant === 'enabled' ||
+    (!Settings.overleaf &&
+      Settings.moduleImportSequence?.includes('track-changes'))
+  ) {
     project.overleaf.history.rangesSupportEnabled = true
   }
 

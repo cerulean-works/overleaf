@@ -527,6 +527,51 @@ async function acceptChanges(req, res) {
   res.status(200).json({ changeContributors, previews })
 }
 
+const reviewActionSchema = z.object({
+  params: z.strictObject({
+    project_id: zz.objectId(),
+    doc_id: zz.objectId(),
+    action: z.enum(['accept', 'reject']),
+  }),
+  body: z.strictObject({
+    user_id: zz.objectId(),
+    own_only: z.boolean(),
+    version: z.number().int().nonnegative(),
+    change_ids: z.array(z.string().min(1).max(100)).min(1).max(2000).optional(),
+    changes: z
+      .array(
+        z.strictObject({
+          start: z.number().int().nonnegative(),
+          length: z.number().int().positive(),
+          type: z.enum(['insert', 'delete']),
+          user_id: z.string(),
+          ts: z.string(),
+          content: z.string(),
+        })
+      )
+      .min(1)
+      .max(2000)
+      .optional(),
+  }),
+})
+
+async function reviewAction(req, res) {
+  const { params, body } = parseReq(req, reviewActionSchema)
+  try {
+    await require('./ReviewActionManager').decide(
+      params.project_id,
+      params.doc_id,
+      params.action,
+      body
+    )
+    res.json({})
+  } catch (error) {
+    if ([403, 409].includes(error.statusCode))
+      return res.sendStatus(error.statusCode)
+    throw error
+  }
+}
+
 const commentWithUserSchema = z.object({
   params: commentParamsSchema,
   body: z.strictObject({
@@ -868,6 +913,7 @@ module.exports = {
   deleteProject: expressify(deleteProject),
   deleteMultipleProjects: expressify(deleteMultipleProjects),
   acceptChanges: expressify(acceptChanges),
+  reviewAction: expressify(reviewAction),
   resolveComment: expressify(resolveComment),
   reopenComment: expressify(reopenComment),
   deleteComment: expressify(deleteComment),

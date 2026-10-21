@@ -1,59 +1,39 @@
 #!/bin/bash
+set -euo pipefail
 
-set -e
+# First source deployments can start without hand-generating signing keys. Keep
+# generated values in the app volume; explicitly configured values always win.
+DATA_DIR="${OVERLEAF_DATA_DIR:-/var/lib/overleaf}"
+ENV_DIR="${OVERLEAF_CONTAINER_ENV_DIR:-/etc/container_environment}"
+SECRET_DIR="$DATA_DIR/secrets"
+umask 077
+mkdir -p "$SECRET_DIR" "$ENV_DIR"
+chmod 700 "$SECRET_DIR"
 
-REQUIRED_SECRETS="
-OVERLEAF_INVITE_TOKEN_SECRET
-"
+persist_signing_key() {
+  local env_name="$1"
+  local filename="$2"
+  local description="$3"
+  local secret_file="$SECRET_DIR/$filename"
+  local explicit_value="${!env_name:-}"
 
-MISSING_ITEMS=""
-for name in ${REQUIRED_SECRETS}; do
-  if [[ -z "${!name}" ]]; then
-    MISSING_ITEMS="$MISSING_ITEMS $name"
+  if [[ -n "$explicit_value" ]] || [[ ! -s "$secret_file" ]]; then
+    SECRET_TEMP=$(mktemp "$SECRET_DIR/.$filename.XXXXXX")
+    trap 'rm -f "$SECRET_TEMP"' EXIT
+    if [[ -n "$explicit_value" ]]; then
+      printf '%s\n' "$explicit_value" > "$SECRET_TEMP"
+    else
+      openssl rand -hex 32 > "$SECRET_TEMP"
+      echo "Created a persistent $description signing key in the application volume."
+    fi
+    mv -f "$SECRET_TEMP" "$secret_file"
+    trap - EXIT
   fi
-done
 
-if [[ "$MISSING_ITEMS" == "" ]]; then
-  exit 0
-fi
+  chmod 600 "$secret_file"
+  printf '%s\n' "$(cat "$secret_file")" > "$ENV_DIR/$env_name"
+  chmod 600 "$ENV_DIR/$env_name"
+}
 
-MISSING_ITEMS=$(echo "$MISSING_ITEMS" | xargs -n1 | sed 's/^/      - /')
-N=$(echo "$MISSING_ITEMS" | wc -l)
-cat <<EOF
-------------------------------------------------------------------------
-
-                     Missing required secrets
-                     ------------------------
-
-  Your configuration is missing $N required secret(s):
-$MISSING_ITEMS
-
-  These secrets must be set to persistent random values and kept
-   stable across container restarts and upgrades. Regenerating them
-   will invalidate previously issued tokens stored in the database.
-
-  Generate a value with, for example:
-
-    openssl rand -base64 32
-
-
-  Overleaf toolkit setups:
-
-    Add the missing variable(s) to config/variables.env and restart:
-
-      github.com/overleaf/toolkit$ bin/up
-
-
-  docker compose setups:
-
-    Add the missing variable(s) to the sharelatex service environment
-     in docker-compose.yml (or your override file) and restart.
-
-
-  Refusing to startup, exiting in 10s.
-
-------------------------------------------------------------------------
-EOF
-
-sleep 10
-exit 101
+persist_signing_key OVERLEAF_INVITE_TOKEN_SECRET invite-token-secret invitation
+persist_signing_key OVERLEAF_SESSION_SECRET session-secret session

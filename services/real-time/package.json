@@ -34,7 +34,7 @@
     "lodash": "^4.18.1",
     "overleaf-editor-core": "workspace:*",
     "proxy-addr": "^2.0.7",
-    "socket.io": "github:overleaf/socket.io#0.9.19-overleaf-12",
+    "socket.io": "patch:socket.io@https%3A//github.com/overleaf/socket.io.git%23commit=7814a16800a7accb646bd34ed0995cd474fb82f6#~/.yarn/patches/socket.io-https-2266d71a24.patch",
     "socket.io-client": "https://github.com/overleaf/socket.io-client/archive/refs/tags/0.9.17-overleaf-6.tar.gz",
     "zod": "^4.0.0",
     "zod-validation-error": "^4.0.1"

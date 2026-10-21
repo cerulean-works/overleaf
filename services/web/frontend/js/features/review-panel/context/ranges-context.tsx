@@ -7,6 +7,7 @@ import {
   useMemo,
   useState,
 } from 'react'
+import { useProjectContext } from '@/shared/context/project-context'
 import { DocumentContainer } from '@/features/ide-react/editor/document-container'
 import {
   Change,
@@ -107,6 +108,7 @@ export const RangesActionsContext = createContext<RangesActions | undefined>(
 export const RangesProvider: FC<React.PropsWithChildren> = ({ children }) => {
   const view = useCodeMirrorViewContext()
   const { projectId } = useIdeReactContext()
+  const { features } = useProjectContext()
   const { currentDocument } = useEditorOpenDocContext()
   const { socket } = useConnectionContext()
   const { sendEvent } = useEditorAnalytics()
@@ -186,9 +188,68 @@ export const RangesProvider: FC<React.PropsWithChildren> = ({ children }) => {
     )
   )
 
+  useSocketListener(
+    socket,
+    'delete-thread',
+    useCallback(
+      (threadId: string, docId: string) => {
+        if (currentDocument?.doc_id === docId && currentDocument.ranges) {
+          currentDocument.ranges.removeCommentId(threadId)
+          setRanges(buildRanges(currentDocument))
+          view.dispatch({ effects: rangesUpdatedEffect.of(null) })
+        }
+      },
+      [currentDocument, view]
+    )
+  )
+
   const actions = useMemo(() => {
     if (!currentDocument) {
       return
+    }
+
+    if (features.reviewActionsViaHttp) {
+      const decide = async (
+        action: 'accept' | 'reject',
+        changes: Ranges['changes']
+      ) => {
+        if (currentDocument.hasBufferedOps()) {
+          throw new Error(
+            'Wait until your edits have synchronized, then try again'
+          )
+        }
+        const version = currentDocument.doc?.getVersion()
+        const body = currentDocument.isHistoryOT()
+          ? {
+              version,
+              changes: changes.map(change => ({
+                start: change.snapshotRange!.start,
+                length: change.snapshotRange!.length,
+                type: isInsertOperation(change.op) ? 'insert' : 'delete',
+                user_id: change.metadata?.user_id,
+                ts: new Date(change.metadata!.ts).toISOString(),
+                content: isInsertOperation(change.op)
+                  ? change.op.i
+                  : change.op.d,
+              })),
+            }
+          : { version, change_ids: changes.map(change => change.id) }
+        await postJSON(
+          `/project/${projectId}/doc/${currentDocument.doc_id}/changes/${action}`,
+          { body }
+        )
+        sendEvent(
+          action === 'accept' ? 'rp-changes-accepted' : 'rp-changes-rejected',
+          {
+            count: changes.length,
+            view: reviewPanelView,
+          }
+        )
+      }
+      return {
+        acceptChanges: (...changes) => decide('accept', changes),
+        rejectChanges: (...changes) => decide('reject', changes),
+      } satisfies RangesActions
     }
 
     if (currentDocument.isHistoryOT()) {
@@ -342,7 +403,14 @@ export const RangesProvider: FC<React.PropsWithChildren> = ({ children }) => {
         },
       } satisfies RangesActions
     }
-  }, [currentDocument, projectId, view, sendEvent, reviewPanelView])
+  }, [
+    currentDocument,
+    projectId,
+    view,
+    sendEvent,
+    reviewPanelView,
+    features.reviewActionsViaHttp,
+  ])
 
   if (!actions) {
     return null

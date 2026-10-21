@@ -30,6 +30,7 @@ import { useFeatureFlag } from '@/shared/context/split-test-context'
 
 export function ProjectListDsNav() {
   const navbarProps = getMeta('ol-navbar')
+  const isCommunityEdition = getMeta('ol-ExposedSettings').env === 'server-ce'
   const footerProps = getMeta('ol-footer')
   const { t } = useTranslation()
   const {
@@ -72,7 +73,7 @@ export function ProjectListDsNav() {
   return (
     <div
       className={classNames('project-ds-nav-page', 'website-redesign', {
-        'ds-nav-hides-top-navbar': showTrashHeader,
+        'ds-nav-hides-top-navbar': showTrashHeader && !isCommunityEdition,
       })}
     >
       <SystemMessages />

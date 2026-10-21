@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+import { useModalsContext } from '@/features/ide-react/context/modals-context'
 import { UserId } from '../../../../../types/user'
 import {
   createContext,
@@ -47,6 +49,8 @@ export const TrackChangesStateProvider: FC<React.PropsWithChildren> = ({
   children,
 }) => {
   const permissions = usePermissionsContext()
+  const { t } = useTranslation()
+  const { showGenericMessageModal } = useModalsContext()
   const { socket } = useConnectionContext()
   const { projectId, project, updateProject, features } = useProjectContext()
   const user = useUserContext()
@@ -88,11 +92,15 @@ export const TrackChangesStateProvider: FC<React.PropsWithChildren> = ({
 
   const saveTrackChanges = useCallback(
     async (trackChangesBody: SaveTrackChangesRequestBody) => {
-      postJSON(`/project/${projectId}/track_changes`, {
-        body: trackChangesBody,
-      })
+      try {
+        await postJSON(`/project/${projectId}/track_changes`, {
+          body: trackChangesBody,
+        })
+      } catch {
+        showGenericMessageModal(t('error'), t('generic_something_went_wrong'))
+      }
     },
-    [projectId]
+    [projectId, showGenericMessageModal, t]
   )
 
   const saveTrackChangesForCurrentUser = useCallback(

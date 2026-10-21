@@ -49,7 +49,7 @@ nav.navbar.navbar-default.navbar-main.navbar-expand-lg(
 
 			#navbar-main-collapse.navbar-collapse.collapse
 				ul.nav.navbar-nav.navbar-right.ms-auto(role='menubar')
-					if canDisplayAdminMenu || canDisplayAdminRedirect || canDisplayProjectUrlLookup || canDisplaySplitTestMenu
+					if hasFeature('saas') && (canDisplayAdminMenu || canDisplayAdminRedirect || canDisplayProjectUrlLookup || canDisplaySplitTestMenu)
 						+nav-item.dropdown.subdued
 							button.dropdown-toggle(
 								aria-haspopup='true'
@@ -196,6 +196,10 @@ nav.navbar.navbar-default.navbar-main.navbar-expand-lg(
 									.disabled.dropdown-item #{getSessionUser().email}
 								+dropdown-menu-divider
 								+dropdown-menu-link-item(href='/user/settings') #{translate('account_settings')}
+								if canDisplayAdminMenu && !hasFeature('saas')
+									+dropdown-menu-link-item(href='/admin') Admin panel
+								if settings.env === 'server-ce' && settings.sourceUrl
+									+dropdown-menu-link-item(href=settings.sourceUrl) Source code
 								if nav.showSubscriptionLink
 									+dropdown-menu-link-item(href='/user/subscription') #{translate('subscription')}
 								+dropdown-menu-divider

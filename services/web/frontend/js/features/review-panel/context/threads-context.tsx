@@ -61,7 +61,7 @@ const ThreadsActionsContext = createContext<ThreadsActions | undefined>(
 )
 
 export const ThreadsProvider: FC<React.PropsWithChildren> = ({ children }) => {
-  const { projectId } = useProjectContext()
+  const { projectId, features } = useProjectContext()
   const { currentDocument } = useEditorOpenDocContext()
   const { isRestrictedTokenMember } = useEditorContext()
   const view = useCodeMirrorViewContext()
@@ -377,7 +377,10 @@ export const ThreadsProvider: FC<React.PropsWithChildren> = ({ children }) => {
           })
         },
         async resolveThread(threadId: string, docId: string) {
-          if (docId !== currentDocument.doc_id) {
+          if (
+            features.reviewActionsViaHttp ||
+            docId !== currentDocument.doc_id
+          ) {
             await httpActions.resolveThread(threadId, docId)
             return
           }
@@ -390,7 +393,10 @@ export const ThreadsProvider: FC<React.PropsWithChildren> = ({ children }) => {
           })
         },
         async reopenThread(threadId: string, docId: string) {
-          if (docId !== currentDocument.doc_id) {
+          if (
+            features.reviewActionsViaHttp ||
+            docId !== currentDocument.doc_id
+          ) {
             await httpActions.reopenThread(threadId, docId)
             return
           }
@@ -403,7 +409,10 @@ export const ThreadsProvider: FC<React.PropsWithChildren> = ({ children }) => {
           })
         },
         async deleteThread(threadId: string, docId: string) {
-          if (docId !== currentDocument.doc_id) {
+          if (
+            features.reviewActionsViaHttp ||
+            docId !== currentDocument.doc_id
+          ) {
             await httpActions.deleteThread(threadId, docId)
             return
           }
@@ -422,6 +431,7 @@ export const ThreadsProvider: FC<React.PropsWithChildren> = ({ children }) => {
   }, [
     view,
     reviewPanelView,
+    features.reviewActionsViaHttp,
     currentDocument,
     projectId,
     isHistoryOT,

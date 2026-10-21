@@ -6,6 +6,7 @@ import EmailHandler from '../Email/EmailHandler.mjs'
 import AuthenticationManager from '../Authentication/AuthenticationManager.mjs'
 import { callbackify, promisify } from 'node:util'
 import PermissionsManager from '../Authorization/PermissionsManager.mjs'
+import SiteInvitationManager from '../ServerAdmin/SiteInvitationManager.mjs'
 
 const assertUserPermissions = PermissionsManager.promises.assertUserPermissions
 
@@ -15,6 +16,10 @@ async function generateAndEmailResetToken(email) {
   const user = await UserGetter.promises.getUserByAnyEmail(email)
 
   if (!user) {
+    return null
+  }
+
+  if (!(await SiteInvitationManager.canRequestPasswordReset(user._id))) {
     return null
   }
 
@@ -49,6 +54,7 @@ function expirePasswordResetToken(token, callback) {
 
 async function getUserForPasswordResetToken(token) {
   let result
+  let tokenUse = 'password'
   try {
     result = await OneTimeTokenHandler.promises.peekValueFromToken(
       'password',
@@ -56,7 +62,16 @@ async function getUserForPasswordResetToken(token) {
     )
   } catch (err) {
     if (err.name === 'NotFoundError') {
-      return
+      tokenUse = SiteInvitationManager.TOKEN_USE
+      try {
+        result = await OneTimeTokenHandler.promises.peekValueFromToken(
+          tokenUse,
+          token
+        )
+      } catch (invitationError) {
+        if (invitationError.name === 'NotFoundError') return
+        throw invitationError
+      }
     } else {
       throw err
     }
@@ -74,18 +89,33 @@ async function getUserForPasswordResetToken(token) {
     must_reconfirm: 1,
   })
 
-  await assertUserPermissions(user, ['change-password'])
-
   if (user == null) {
     return { user: null, remainingPeeks: 0 }
-  } else if (data.user_id != null && data.user_id === user._id.toString()) {
-    return { user, remainingPeeks }
+  }
+
+  await assertUserPermissions(user, ['change-password'])
+  if (
+    !(await SiteInvitationManager.isPasswordResetAllowed(
+      user._id,
+      data,
+      tokenUse
+    ))
+  ) {
+    return { user: null, remainingPeeks: 0 }
+  }
+
+  const invitationMetadata =
+    tokenUse === SiteInvitationManager.TOKEN_USE
+      ? { invitationData: data, tokenUse }
+      : {}
+  if (data.user_id != null && data.user_id === user._id.toString()) {
+    return { user, remainingPeeks, ...invitationMetadata }
   } else if (
     data.v1_user_id != null &&
     user.overleaf != null &&
     data.v1_user_id === user.overleaf.id
   ) {
-    return { user, remainingPeeks }
+    return { user, remainingPeeks, ...invitationMetadata }
   } else {
     return { user: null, remainingPeeks: 0 }
   }
@@ -94,7 +124,7 @@ async function getUserForPasswordResetToken(token) {
 async function setNewUserPassword(token, password, auditLog) {
   const result =
     await PasswordResetHandler.promises.getUserForPasswordResetToken(token)
-  const { user } = result || {}
+  const { user, invitationData, tokenUse = 'password' } = result || {}
 
   if (!user) {
     return {
@@ -103,27 +133,39 @@ async function setNewUserPassword(token, password, auditLog) {
       userId: null,
     }
   }
-  await UserAuditLogHandler.promises.addEntry(
+  const resetResult = await SiteInvitationManager.withPasswordResetAllowed(
     user._id,
-    'reset-password',
-    auditLog.initiatorId,
-    auditLog.ip,
-    { token: token.substring(0, AUDIT_LOG_TOKEN_PREFIX_LENGTH) }
+    invitationData,
+    tokenUse,
+    async () => {
+      await UserAuditLogHandler.promises.addEntry(
+        user._id,
+        'reset-password',
+        auditLog.initiatorId,
+        auditLog.ip,
+        { token: token.substring(0, AUDIT_LOG_TOKEN_PREFIX_LENGTH) }
+      )
+
+      const reset = await AuthenticationManager.promises.setUserPassword(
+        user,
+        password
+      )
+      if (reset) {
+        if (tokenUse === 'password') {
+          await PasswordResetHandler.promises.expirePasswordResetToken(token)
+        } else {
+          await OneTimeTokenHandler.promises.expireToken(tokenUse, token)
+        }
+      }
+      return {
+        found: true,
+        reset,
+        userId: user._id,
+        mustReconfirm: user.must_reconfirm,
+      }
+    }
   )
-
-  const reset = await AuthenticationManager.promises.setUserPassword(
-    user,
-    password
-  )
-
-  await PasswordResetHandler.promises.expirePasswordResetToken(token)
-
-  return {
-    found: true,
-    reset,
-    userId: user._id,
-    mustReconfirm: user.must_reconfirm,
-  }
+  return resetResult || { found: false, reset: false, userId: null }
 }
 
 const PasswordResetHandler = {

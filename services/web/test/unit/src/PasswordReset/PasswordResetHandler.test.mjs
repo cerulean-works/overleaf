@@ -32,6 +32,19 @@ describe('PasswordResetHandler', function () {
       },
     }
 
+    ctx.SiteInvitationManager = {
+      TOKEN_USE: 'site-invitation',
+      canRequestPasswordReset: sinon.stub().resolves(true),
+      isPasswordResetAllowed: sinon.stub().resolves(true),
+      withPasswordResetAllowed: sinon
+        .stub()
+        .callsFake((_userId, _data, _use, action) => action()),
+    }
+    vi.doMock(
+      '../../../../app/src/Features/ServerAdmin/SiteInvitationManager.mjs',
+      () => ({ default: ctx.SiteInvitationManager })
+    )
+
     vi.doMock('../../../../app/src/Features/User/UserAuditLogHandler', () => ({
       default: (ctx.UserAuditLogHandler = {
         promises: {
@@ -92,6 +105,17 @@ describe('PasswordResetHandler', function () {
   })
 
   describe('generateAndEmailResetToken', function () {
+    it('does not issue an ordinary password reset for an unaccepted invitation', async function (ctx) {
+      ctx.UserGetter.promises.getUserByAnyEmail.resolves(ctx.user)
+      ctx.SiteInvitationManager.canRequestPasswordReset.resolves(false)
+      const result =
+        await ctx.PasswordResetHandler.promises.generateAndEmailResetToken(
+          ctx.email
+        )
+      expect(result).to.equal(null)
+      sinon.assert.notCalled(ctx.OneTimeTokenHandler.promises.getNewToken)
+      sinon.assert.notCalled(ctx.EmailHandler.promises.sendEmail)
+    })
     it('should check the user exists', function (ctx) {
       ctx.UserGetter.promises.getUserByAnyEmail.resolves()
       ctx.PasswordResetHandler.generateAndEmailResetToken(
@@ -611,6 +635,38 @@ describe('PasswordResetHandler', function () {
         user: { _id: ctx.user._id, email: ctx.email },
         remainingPeeks: 1,
       })
+    })
+
+    it('rejects legacy password tokens for tracked pending or revoked accounts', async function (ctx) {
+      ctx.SiteInvitationManager.isPasswordResetAllowed.resolves(false)
+      const result =
+        await ctx.PasswordResetHandler.promises.getUserForPasswordResetToken(
+          ctx.token
+        )
+      expect(result).to.deep.equal({ user: null, remainingPeeks: 0 })
+    })
+
+    it('resolves a dedicated invitation token after the legacy namespace misses', async function (ctx) {
+      const data = {
+        user_id: ctx.user_id,
+        email: ctx.email,
+        invitation_id: 'invitation',
+        generation: 'generation',
+      }
+      const missing = new Error('missing')
+      missing.name = 'NotFoundError'
+      ctx.OneTimeTokenHandler.promises.peekValueFromToken
+        .withArgs('password', ctx.token)
+        .rejects(missing)
+      ctx.OneTimeTokenHandler.promises.peekValueFromToken
+        .withArgs('site-invitation', ctx.token)
+        .resolves({ data, remainingPeeks: 2 })
+      const result =
+        await ctx.PasswordResetHandler.promises.getUserForPasswordResetToken(
+          ctx.token
+        )
+      expect(result.invitationData).to.deep.equal(data)
+      expect(result.tokenUse).to.equal('site-invitation')
     })
   })
 })

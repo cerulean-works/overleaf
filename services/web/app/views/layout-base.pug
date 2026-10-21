@@ -100,7 +100,7 @@ html(
 
 	body(
 		class={
-			'thin-footer': showThinFooter,
+			'thin-footer': showThinFooter && settings.env !== 'server-ce',
 			'website-redesign': isWebsiteRedesign === true || websiteRedesignOverride,
 			'application-page': isApplicationPage,
 			'red-nav-bar-for-admins': !settings.isDevEnv && hasFeature('saas') && hasAdminAccess(),

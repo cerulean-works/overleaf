@@ -74,7 +74,7 @@ describe('AdminController', function () {
       await ctx.controller.index(ctx.req, ctx.res, ctx.next)
       ctx.ProjectGetter.promises.findAllDebugProjects.called.should.equal(true)
       ctx.res.render
-        .calledWithMatch('admin/index', {
+        .calledWithMatch('admin/legacy-index', {
           debugProjects: [],
         })
         .should.equal(true)

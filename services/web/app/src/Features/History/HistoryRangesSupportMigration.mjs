@@ -276,5 +276,5 @@ async function hardResyncProject(projectId) {
 export default {
   migrateProjects: callbackify(migrateProjects),
   migrateProject: callbackify(migrateProject),
-  promises: { migrateProjects, migrateProject },
+  promises: { migrateProjects, migrateProject, processProject },
 }

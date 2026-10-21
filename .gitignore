@@ -4,3 +4,12 @@
 # user defined files
 .env
 docker-compose.override.yml
+
+# Local Yarn installation artifacts
+.yarn/cache/
+.yarn/unplugged/
+.yarn/install-state.gz
+.pnp.cjs
+.pnp.loader.mjs
+node_modules/
+.cache/
