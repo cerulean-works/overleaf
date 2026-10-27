@@ -52,7 +52,9 @@ Build and run this fork directly from its source checkout:
 docker compose up --build -d
 ```
 
-Open <http://localhost:8080/launchpad> to create the first administrator. Optional
+In Dokploy, route your domain to the `sharelatex` service on container port `80`
+and set `OVERLEAF_SITE_URL` to that public URL. Open `/launchpad` on your domain
+to create the first administrator. No host ports are published. Environment
 configuration is documented in [`.env.example`](.env.example). See the
 [source deployment guide](server-ce/README.md) for persistent data, invitation
 secrets, TeX package installation, upgrades, and reverse proxies.

@@ -4,15 +4,17 @@ From the repository root, use Docker Engine/Desktop with the Compose plugin
 (version 2.24 or newer):
 
 ```sh
-cp .env.example .env          # optional; defaults also work without this file
-# Edit .env if you need a different public URL, email settings, or source link.
+cp .env.example .env          # or configure the variables in Dokploy
+# Set the public URL and configure email settings or the source link as needed.
 docker compose up --build -d
 docker compose ps
 docker compose logs -f sharelatex
 ```
 
-Open <http://localhost:8080/launchpad> to create the first administrator, then
-use Account → Admin panel. The default port binds to the local machine. The
+In Dokploy, route your domain to the `sharelatex` service on container port `80`
+and set `OVERLEAF_SITE_URL` to that public URL. Open `/launchpad` on your domain
+to create the first administrator, then use Account → Admin panel. Compose does
+not publish host ports; Dokploy's reverse proxy provides access to the app. The
 application is built from the checkout with `server-ce/Dockerfile`; no published
 Overleaf application or Overleaf base image is required. OS, MongoDB, and Redis
 images are downloaded normally. The first build downloads TeX Live and Node
@@ -27,7 +29,8 @@ available for CI jobs that publish the dependency target.
 MongoDB initializes an `overleaf` replica set on a fresh volume. The initializer
 also handles existing replica sets without replacing them. The app waits for
 a writable primary, successful initialization, and a healthy Redis server.
-MongoDB and Redis do not publish host ports.
+MongoDB and Redis do not publish host ports. Redis uses version 7.4, matching
+existing Redis 7.4 deployments without downgrading their persistence format.
 
 ## Node.js security updates
 
@@ -138,10 +141,10 @@ part of the default deployment validation.
 ## Public URLs and reverse proxies
 
 Set `OVERLEAF_SITE_URL` to the URL users open, including HTTPS when applicable.
-A proxy running on the Docker host can forward to `127.0.0.1:8080`; allow
-WebSocket upgrades and long-lived connections. If your proxy runs in a container,
-put it on the Compose network and target `sharelatex:80`, or explicitly change
-the host binding. Set `OVERLEAF_TRUSTED_PROXY_IPS` to include the proxy's address
+In Dokploy, configure the domain to target service `sharelatex`, container port
+`80`. The proxy must share a Docker network with the app and allow WebSocket
+upgrades and long-lived connections. No host port mapping is required.
+Set `OVERLEAF_TRUSTED_PROXY_IPS` to include the proxy's address
 range and `loopback` for nginx inside the app container. For public HTTPS,
 uncomment `OVERLEAF_SECURE_COOKIE=true` in `.env`. Omit that variable entirely for
 local HTTP: this setting is enabled by the variable's presence, even if its value
