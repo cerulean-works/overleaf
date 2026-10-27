@@ -29,6 +29,29 @@ also handles existing replica sets without replacing them. The app waits for
 a writable primary, successful initialization, and a healthy Redis server.
 MongoDB and Redis do not publish host ports.
 
+## Node.js security updates
+
+The image pins Node.js **24.22.1**, the October 21, 2026 security release,
+including the Brotli decoder fix (CVE-2026-111497). Earlier images can contain
+an affected runtime even though they install from the NodeSource 24.x channel:
+Docker can reuse the cached apt layer. `NODE_VERSION` pins the package and
+invalidates that layer when changed; local development requires at least 24.22.1.
+See the [Node.js advisory](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases).
+
+After updating the checkout, rebuild and recreate the application:
+
+```sh
+docker compose build --pull sharelatex
+docker compose up -d --no-deps --force-recreate sharelatex
+docker compose exec sharelatex node --version
+docker compose ps sharelatex
+```
+
+Expect `v24.22.1`. Keep all existing volumes and secrets, and verify editor
+reconnects and a document compile after deployment. Updating the checkout alone
+does not patch a running container. This assessment covers the source build;
+production runtime versions must be checked on the deployment host.
+
 ## Persistent state and secrets
 
 Compose creates separate named volumes for MongoDB, Redis, application files,
