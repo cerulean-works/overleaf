@@ -12,7 +12,10 @@ ENV TEXMFVAR=/var/lib/overleaf/tmp/texmf-var
 
 # Update to ensure dependencies are updated
 # ------------------------------------------
-ENV REBUILT_AFTER="2026-08-27"
+ENV REBUILT_AFTER="2026-10-21"
+
+# October 2026 security release; changing this also invalidates the apt layer.
+ARG NODE_VERSION=24.22.1
 
 # Install dependencies
 # --------------------
@@ -34,7 +37,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 &&  curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
 &&  echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
 &&  apt-get update \
-&&  apt-get install -y nodejs openssl \
+&&  apt-get install -y nodejs="${NODE_VERSION}-1nodesource1" openssl \
 &&  npm install --global node-gyp@11 \
     \
 &&  rm -rf \
