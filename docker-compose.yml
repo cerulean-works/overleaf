@@ -1,7 +1,15 @@
 name: ${COMPOSE_PROJECT_NAME:-overleaf}
 
+# Cap each container's json-file log at 1 GB (4 rotated files of 250 MB).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 250m
+    max-file: '4'
+
 services:
   sharelatex:
+    logging: *logging
     build:
       context: .
       dockerfile: server-ce/Dockerfile
@@ -48,6 +56,7 @@ services:
       start_period: 90s
 
   mongo:
+    logging: *logging
     image: mongo:8.0
     restart: unless-stopped
     command: ['mongod', '--replSet', 'overleaf', '--bind_ip_all']
@@ -66,6 +75,7 @@ services:
       start_period: 20s
 
   mongo-init:
+    logging: *logging
     image: mongo:8.0
     restart: 'no'
     depends_on:
@@ -77,6 +87,7 @@ services:
       - ./server-ce/scripts/init-mongo.js:/scripts/init-mongo.js:ro
 
   redis:
+    logging: *logging
     image: redis:7.4
     restart: unless-stopped
     command: ['redis-server', '--appendonly', 'yes']
